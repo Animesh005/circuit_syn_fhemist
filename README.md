@@ -4,6 +4,13 @@
 
 For enabling and detecting HMM in the system, follow the steps from: https://developer.nvidia.com/blog/simplifying-gpu-application-development-with-heterogeneous-memory-management/
 
+After enabling HMM run
+
+```bash
+export CUDA_HOME=/usr/local/cuda-12 
+export PATH=$CUDA_HOME/bin:$PATH
+```
+
 ## Run only CMIS optimization
 
 ```bash
