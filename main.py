@@ -37,7 +37,7 @@ def load_netlist(filepath: str) -> list:
         parts = line.split()
         if not parts:
             continue
-        if 'INV' in parts:
+        if parts[-1] in ('INV', 'EQW'):
             continue
         converted = [int(x) for x in parts[:-1]] + [parts[-1]]
         netlist.append(converted)
