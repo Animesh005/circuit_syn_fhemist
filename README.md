@@ -367,8 +367,6 @@ because `main.py` skips them.
 4. **Scale up** — `cavlc`, `i2c`, `sin`, then the larger EPFL / SCALE-MAMBA circuits as time
    and memory allow.
 
-*(Add your measured runtimes and reduction figures here so reviewers know what to expect.)*
-
 ---
 
 ## Known limitations
@@ -376,18 +374,6 @@ because `main.py` skips them.
 * **Dense adjacency matrix.** The conflict graph is materialized as a dense `n × n` NumPy
   array, so host memory grows quadratically with the number of distinct gates. The largest
   circuits (`hyp`, `sha512`, `FP-sqrt`) need a machine with substantial RAM.
-
----
-
-## Troubleshooting
-
-| Symptom | Cause / fix |
-|---------|-------------|
-| `cudaMallocManaged failed with code 2` | Out of managed memory. Lower `num_replicas`, or confirm HMM is enabled — without it, managed allocations cannot exceed VRAM. |
-| `nvrtc`/`nvcc` compilation error on startup | `nvcc` is not on `PATH`. Re-run the `export CUDA_HOME` / `export PATH` block. |
-| `OSError: libcudart.so: cannot open shared object file` | Add `$CUDA_HOME/lib64` to `LD_LIBRARY_PATH`. |
-| `ImportError: cupy` / wrong CUDA version | Install the CuPy wheel matching your toolkit: `cupy-cuda12x` or `cupy-cuda11x`. |
-| Host RAM exhausted on a large circuit | Expected — see *Known limitations*. Start with smaller benchmarks. |
 
 ---
 
