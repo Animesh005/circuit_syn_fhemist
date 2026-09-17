@@ -68,15 +68,55 @@ circuit_syn_fhemist/
 
 ### 1. Enable HMM
 
-Follow NVIDIA's guide to enable and verify HMM on the machine:
+On a machine meeting the requirements above, HMM is active by default — there is usually
+nothing to turn on. Background and details:
 <https://developer.nvidia.com/blog/simplifying-gpu-application-development-with-heterogeneous-memory-management/>
 
-Verify it is active:
+**Verify it is active:**
 
 ```bash
-cat /sys/module/nvidia/parameters/uvm_disable_hmm   # expect: N
-nvidia-smi                                          # confirm driver + GPU
+nvidia-smi -q | grep -i Addressing
 ```
+
+```
+    Addressing Mode                       : HMM
+```
+
+`HMM` is what you want. `ATS` also provides system-allocated memory access (on coherent
+platforms such as Grace Hopper) and works here too. `None` means neither is available —
+check the driver, kernel and GPU architecture against the table above.
+
+If the field is missing entirely, the driver predates the feature (r535+ required).
+
+**Or check from Python**, which tests exactly what this code relies on:
+
+```bash
+python3 -c "
+import cupy
+attrs = cupy.cuda.Device(0).attributes
+for k, v in sorted(attrs.items()):
+    if 'Pageable' in k or 'ManagedMemory' in k or 'ManagedAccess' in k:
+        print(f'{k:45s} {v}')
+"
+```
+
+```
+ConcurrentManagedAccess                       1
+ManagedMemory                                 1
+PageableMemoryAccess                          1
+PageableMemoryAccessUsesHostPageTables        0
+```
+
+`PageableMemoryAccess = 1` is the one that matters — the GPU can reach system-allocated
+memory. (`PageableMemoryAccessUsesHostPageTables` distinguishes ATS, where it is `1`, from
+HMM, where it is `0`.) If `PageableMemoryAccess` is `0`, the managed allocations in
+`cuda_utils.py` cannot oversubscribe device memory and large circuits will fail.
+
+> The module parameter `/sys/module/nvidia_uvm/parameters/uvm_disable_hmm` (note:
+> `nvidia_uvm`, not `nvidia`) reports whether HMM was explicitly *disabled*. It only exists
+> once the `nvidia_uvm` module is loaded — which happens on first CUDA use, not at boot — and
+> only on drivers that expose it, so a "No such file or directory" here is not by itself a
+> sign that HMM is unavailable. Prefer the `nvidia-smi` check above.
 
 ### 2. Point the environment at the CUDA toolkit
 
