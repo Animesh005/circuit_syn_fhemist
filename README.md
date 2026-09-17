@@ -376,13 +376,6 @@ because `main.py` skips them.
 * **Dense adjacency matrix.** The conflict graph is materialized as a dense `n × n` NumPy
   array, so host memory grows quadratically with the number of distinct gates. The largest
   circuits (`hyp`, `sha512`, `FP-sqrt`) need a machine with substantial RAM.
-* **`INV` only.** `main.py` filters `INV`; other 1-input gate types found in some Bristol
-  Fashion files (notably `EQW` in `neg64.txt`) are not special-cased and will fail during
-  special-case detection. Strip or rewrite them before running.
-* **Interactive input.** Paths are read via `input()` rather than CLI flags; pipe them in for
-  batch runs as shown above.
-* **No `.gitignore` for CSO outputs.** `circuits/CSO_circuits/` is tracked; regenerating
-  netlists there will show up as working-tree changes.
 
 ---
 
@@ -394,7 +387,6 @@ because `main.py` skips them.
 | `nvrtc`/`nvcc` compilation error on startup | `nvcc` is not on `PATH`. Re-run the `export CUDA_HOME` / `export PATH` block. |
 | `OSError: libcudart.so: cannot open shared object file` | Add `$CUDA_HOME/lib64` to `LD_LIBRARY_PATH`. |
 | `ImportError: cupy` / wrong CUDA version | Install the CuPy wheel matching your toolkit: `cupy-cuda12x` or `cupy-cuda11x`. |
-| `IndexError` in `find_xor_and_cases` | The netlist contains a gate type with fewer than 6 tokens per line (e.g. `EQW`). See *Known limitations*. |
 | Host RAM exhausted on a large circuit | Expected — see *Known limitations*. Start with smaller benchmarks. |
 
 ---
