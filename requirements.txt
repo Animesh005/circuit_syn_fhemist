@@ -1,0 +1,12 @@
+# Python dependencies for circuit_syn_fhemist
+#
+# Requires an NVIDIA GPU with HMM enabled and the CUDA 12.x toolkit on PATH
+# (nvcc is needed at runtime — the Max-Cut kernel is JIT-compiled).
+#
+# On CUDA 11, replace cupy-cuda12x with cupy-cuda11x.
+
+numpy>=1.24
+scipy>=1.10
+networkx>=3.0
+numba>=0.58
+cupy-cuda12x>=12.0
