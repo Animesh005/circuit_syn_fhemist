@@ -40,83 +40,61 @@ circuit_syn_fhemist/
 
 ## Requirements
 
+## Requirements
+
 ### Hardware
 
 | Component | Requirement |
 |-----------|-------------|
-| GPU | NVIDIA GPU with **Heterogeneous Memory Management (HMM)** support *(fill in the exact model and VRAM you evaluated on)* |
-| Driver | NVIDIA **open** kernel modules, r535 or newer (HMM is not available on the proprietary modules) |
-| Host RAM | Scales with circuit size — the conflict graph is stored as a dense `n × n` matrix *(fill in what you used)* |
+| GPU | NVIDIA Pascal or newer, on Linux — i.e. any GPU reporting `ConcurrentManagedAccess = 1` |
+| Driver | Any driver providing CUDA 12.x |
+| CUDA | 12.x — **`nvcc` must be on `PATH`** |
+| Host RAM | Scales with circuit size — the conflict graph is stored as a dense `n × n` matrix |
 
-> **Why HMM?** `mis_solver.py` allocates the replica/partition buffers with
-> `cudaMallocManaged` and migrates them on demand between host and device
-> (`cuda_utils.py`). On large circuits these buffers exceed device memory, and HMM is what
-> lets the kernel oversubscribe GPU memory transparently.
+> **What the solver needs.** `mis_solver.py` allocates the replica/partition buffers with
+> `cudaMallocManaged` (`cuda_utils.py`) and migrates them on demand between host and device.
+> On large circuits these buffers exceed device memory, so the GPU must support **full
+> unified memory** — GPU page faulting and managed-memory oversubscription. That is the
+> `cudaDevAttrConcurrentManagedAccess` capability, available on Pascal and newer under Linux.
+> See [Unified and System Memory](https://docs.nvidia.com/cuda/cuda-programming-guide/02-basics/understanding-memory.html).
 
 ### Software
 
 | Component | Version |
 |-----------|---------|
-| OS | *(fill in, e.g. Ubuntu 22.04)* |
-| CUDA Toolkit | 12.x — **`nvcc` must be on `PATH`**, the Max-Cut kernel is JIT-compiled with the `nvcc` backend |
-| Python | *(fill in, e.g. 3.10)* |
+| OS | *(e.g. Ubuntu 22.04)* |
+| CUDA Toolkit | 12.x — the Max-Cut kernel is JIT-compiled with the `nvcc` backend |
+| Python | *(e.g. 3.10)* |
 | Python packages | see `requirements.txt` |
 
 ---
-
 ## Installation
 
-### 1. Enable HMM
+### 1. Verify unified memory support
 
-On a machine meeting the requirements above, HMM is active by default — there is usually
-nothing to turn on. Background and details:
-<https://developer.nvidia.com/blog/simplifying-gpu-application-development-with-heterogeneous-memory-management/>
-
-**Verify it is active:**
-
-```bash
-nvidia-smi -q | grep -i Addressing
-```
-
-```
-    Addressing Mode                       : HMM
-```
-
-`HMM` is what you want. `ATS` also provides system-allocated memory access (on coherent
-platforms such as Grace Hopper) and works here too. `None` means neither is available —
-check the driver, kernel and GPU architecture against the table above.
-
-If the field is missing entirely, the driver predates the feature (r535+ required).
-
-**Or check from Python**, which tests exactly what this code relies on:
+This is a property of the GPU and platform. Check it:
 
 ```bash
 python3 -c "
 import cupy
-attrs = cupy.cuda.Device(0).attributes
-for k, v in sorted(attrs.items()):
-    if 'Pageable' in k or 'ManagedMemory' in k or 'ManagedAccess' in k:
-        print(f'{k:45s} {v}')
+a = cupy.cuda.Device(0).attributes
+for k in ('ManagedMemory', 'ConcurrentManagedAccess', 'PageableMemoryAccess'):
+    print(f'{k:28s} {a.get(k)}')
 "
 ```
 
 ```
-ConcurrentManagedAccess                       1
-ManagedMemory                                 1
-PageableMemoryAccess                          1
-PageableMemoryAccessUsesHostPageTables        0
+ManagedMemory                1
+ConcurrentManagedAccess      1     <-- the one that matters
+PageableMemoryAccess         0     
 ```
 
-`PageableMemoryAccess = 1` is the one that matters — the GPU can reach system-allocated
-memory. (`PageableMemoryAccessUsesHostPageTables` distinguishes ATS, where it is `1`, from
-HMM, where it is `0`.) If `PageableMemoryAccess` is `0`, the managed allocations in
-`cuda_utils.py` cannot oversubscribe device memory and large circuits will fail.
+`ConcurrentManagedAccess = 1` means the GPU supports full unified memory: page faulting and
+**oversubscription of managed allocations**. That is exactly what `cuda_utils.py` relies on.
+Every Pascal-or-newer GPU on Linux reports `1`.
 
-> The module parameter `/sys/module/nvidia_uvm/parameters/uvm_disable_hmm` (note:
-> `nvidia_uvm`, not `nvidia`) reports whether HMM was explicitly *disabled*. It only exists
-> once the `nvidia_uvm` module is loaded — which happens on first CUDA use, not at boot — and
-> only on drivers that expose it, so a "No such file or directory" here is not by itself a
-> sign that HMM is unavailable. Prefer the `nvidia-smi` check above.
+If it reports `0`, managed allocations cannot exceed VRAM and the large circuits will fail.
+That happens on Windows and on Tegra, not on a normal Linux workstation or server.
 
 ### 2. Point the environment at the CUDA toolkit
 
